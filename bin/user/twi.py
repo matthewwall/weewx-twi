@@ -117,7 +117,7 @@ class TWIStation(object):
                       'ESE': 112.5, 'SE': 135, 'SSE': 157.5, 'S': 180,
                       'SSW': 202.5, 'SW': 225, 'WSW': 247.5, 'W': 270,
                       'WNW': 292.5, 'NW': 315, 'NNW': 337.5}
-    DEFAULT_PORT = '/dev/ttyS0'
+    DEFAULT_PORT = '/dev/ttyUSB0'
 
     def __init__(self, port):
         self.port = port
