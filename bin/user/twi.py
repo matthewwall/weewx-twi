@@ -130,12 +130,6 @@ class TWIStation(object):
         self.timeout = 3 # seconds
         self.serial_port = None
 
-    def open(self):
-        pass
-
-    def shutdown(self):
-        pass
-
     def __enter__(self):
         self.open()
         return self
@@ -153,6 +147,9 @@ class TWIStation(object):
             logdbg("close serial port %s" % self.port)
             self.serial_port.close()
             self.serial_port = None
+
+    def shutdown(self):
+        self.close()
 
     def get_data(self, cmd):
         self.serial_port.write(cmd)
