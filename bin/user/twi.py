@@ -144,6 +144,7 @@ class TWIStation(object):
             self.serial_port = None
 
     def get_data(self, cmd):
+        logdbg("send cmd: %s" % cmd)
         self.serial_port.write(cmd)
         buf = self.serial_port.readline()
         logdbg("station said: %s" % ' '.join(["%0.2X" % ord(c) for c in buf]))
