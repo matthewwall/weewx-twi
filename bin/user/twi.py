@@ -19,6 +19,7 @@ import syslog
 import time
 
 import weewx.drivers
+from weewx.wxformulas import calculate_rain
 
 DRIVER_NAME = 'TWI'
 DRIVER_VERSION = '0.1'
@@ -81,7 +82,7 @@ class TWIDriver(weewx.drivers.AbstractDevice):
         loginf('firmware serial: %s' % self._station.get_firmware_serial())
 
     def closePort(self):
-        self._station.shutdown()
+        self._station.close()
 
     def hardware_name(self):
         return self._model
@@ -106,14 +107,8 @@ class TWIDriver(weewx.drivers.AbstractDevice):
         pkg['extraTemp1'] = data.get('temperature_aux')
         pkg['outHumidity'] = data.get('humidity')
         pkg['pressure'] = data.get('pressure')
-
-        # calculate the rain delta from rain total
-        if self.last_rain is not None:
-            pkt['rain'] = data['rain_total'] - self.last_rain
-        else:
-            pkt['rain'] = None
+        pkt['rain'] = calculate_rain(data['rain_total'], self.last_rain)
         self.last_rain = pkt['rain_total']
-
         return pkt
 
 
@@ -147,9 +142,6 @@ class TWIStation(object):
             logdbg("close serial port %s" % self.port)
             self.serial_port.close()
             self.serial_port = None
-
-    def shutdown(self):
-        self.close()
 
     def get_data(self, cmd):
         self.serial_port.write(cmd)
