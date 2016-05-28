@@ -108,7 +108,7 @@ class TWIDriver(weewx.drivers.AbstractDevice):
         pkg['outHumidity'] = data.get('humidity')
         pkg['pressure'] = data.get('pressure')
         pkt['rain'] = calculate_rain(data['rain_total'], self.last_rain)
-        self.last_rain = pkt['rain_total']
+        self.last_rain = data['rain_total']
         return pkt
 
 
