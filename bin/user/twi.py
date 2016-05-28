@@ -55,7 +55,7 @@ class TWIConfigurationEditor(weewx.drivers.AbstractConfEditor):
     port = /dev/ttyUSB0
 
     # The driver to use
-    driver = weewx.drivers.twi
+    driver = user.twi
 """
 
     def prompt_for_settings(self):
