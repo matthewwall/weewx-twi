@@ -101,12 +101,12 @@ class TWIDriver(weewx.drivers.AbstractDevice):
     def _data_to_packet(self, data):
         pkt = {'dateTime': int(time.time() + 0.5), 'usUnits': weewx.US}
         pkt['windDir'] = data.get('wind_dir')
-        pkg['windSpeed'] = data.get('wind_speed')
-        pkg['inTemp'] = data.get('temperature_in')
-        pkg['outTemp'] = data.get('temperature_out')
-        pkg['extraTemp1'] = data.get('temperature_aux')
-        pkg['outHumidity'] = data.get('humidity')
-        pkg['pressure'] = data.get('pressure')
+        pkt['windSpeed'] = data.get('wind_speed')
+        pkt['inTemp'] = data.get('temperature_in')
+        pkt['outTemp'] = data.get('temperature_out')
+        pkt['extraTemp1'] = data.get('temperature_aux')
+        pkt['outHumidity'] = data.get('humidity')
+        pkt['pressure'] = data.get('pressure')
         pkt['rain'] = calculate_rain(data['rain_total'], self.last_rain)
         self.last_rain = data['rain_total']
         return pkt
