@@ -54,6 +54,12 @@ class TWIConfigurationEditor(weewx.drivers.AbstractConfEditor):
     # The serial port to which the station is connected
     port = /dev/ttyUSB0
 
+    # The station model, such as WRL, WLS, or WPS
+    model = WRL
+
+    # How often, in seconds, to query the hardware for data
+    poll_interval = 15
+
     # The driver to use
     driver = user.twi
 """
