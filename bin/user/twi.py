@@ -71,11 +71,11 @@ class TWIDriver(weewx.drivers.AbstractDevice):
         self._model = stn_dict.get('model', 'WRL')
         self._poll_interval = int(stn_dict.get('poll_interval', 15))
         loginf('poll interval is %s' % self._poll_interval)
-        self._max_tries = int(stn_dict.get('max_tries', 10))
-        self._retry_wait = int(stn_dict.get('retry_wait', 10))
+        max_tries = int(stn_dict.get('max_tries', 10))
+        retry_wait = int(stn_dict.get('retry_wait', 10))
         port = stn_dict.get('port', TWIStation.DEFAULT_PORT)
         self.last_rain = None
-        self._station = TWIStation(port)
+        self._station = TWIStation(port, max_tries, retry_wait)
         self._station.open()
         loginf('unit id: %s' % self._station.get_unit_id())
         loginf('firmware version: %s' % self._station.get_firmware_version())
@@ -89,7 +89,7 @@ class TWIDriver(weewx.drivers.AbstractDevice):
 
     def genLoopPackets(self):
         while True:
-            raw = self._station.get_current(self.max_tries, self.retry_wait)
+            raw = self._station.get_current()
             if raw:
                 logdbg("raw data: %s" % raw)
                 data = TWIStation.parse_current(raw)
@@ -119,10 +119,12 @@ class TWIStation(object):
                       'WNW': 292.5, 'NW': 315, 'NNW': 337.5}
     DEFAULT_PORT = '/dev/ttyUSB0'
 
-    def __init__(self, port):
+    def __init__(self, port, max_tries=5, retry_wait=10):
         self.port = port
         self.baudrate = 19200
         self.timeout = 3 # seconds
+        self.max_tries = max_tries
+        self.retry_wait = retry_wait
         self.serial_port = None
 
     def __enter__(self):
@@ -151,22 +153,23 @@ class TWIStation(object):
         buf = buf.strip()
         return buf
 
-    def get_data_with_retry(self, cmd, max_tries=5, retry_wait=10):
-        for ntries in range(0, max_tries):
+    def get_data_with_retry(self, cmd):
+        for ntries in range(0, self.max_tries):
             try:
                 buf = self.get_data(cmd)
                 return buf
             except (serial.serialutil.SerialException, weewx.WeeWxIOError), e:
                 loginf("Failed attempt %d of %d to get readings: %s" %
-                       (ntries + 1, max_tries, e))
-                time.sleep(retry_wait)
+                       (ntries + 1, self.max_tries, e))
+                time.sleep(self.retry_wait)
         else:
-            msg = "Max retries (%d) exceeded for command '%s'" % (max_tries, cmd)
+            msg = "Max retries (%d) exceeded for command '%s'" % (
+                self._max_tries, cmd)
             logerr(msg)
             raise weewx.RetriesExceeded(msg)
 
-    def get_current(self, max_tries=5, retry_wait=10):
-        return self.get_data_with_retry('R', max_tries, retry_wait)
+    def get_current(self):
+        return self.get_data_with_retry('R')
 
     def get_firmware_version(self):
         return self.get_data_with_retry('V')
