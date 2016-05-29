@@ -70,7 +70,7 @@ class TWIDriver(weewx.drivers.AbstractDevice):
         loginf('driver version is %s' % DRIVER_VERSION)
         self._model = stn_dict.get('model', 'WRL')
         self._poll_interval = int(stn_dict.get('poll_interval', 15))
-        loginf('poll interval is %s' % poll_interval)
+        loginf('poll interval is %s' % self._poll_interval)
         self._max_tries = int(stn_dict.get('max_tries', 10))
         self._retry_wait = int(stn_dict.get('retry_wait', 10))
         port = stn_dict.get('port', TWIStation.DEFAULT_PORT)
