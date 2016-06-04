@@ -1,2 +1,7 @@
+0.2 04jun2016
+* fixed whitespace parsing issue (thanks to jason kitchens)
+* fixed rain calculation (thanks to jason kitchens)
+* use r command instead of R command
+
 0.1 28may2016
 * initial release

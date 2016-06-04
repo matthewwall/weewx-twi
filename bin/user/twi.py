@@ -6,6 +6,37 @@ with at least the following models: WLS, WRL, WR, WPS.
 
 Based on the protocol as specified by TWI:
   http://txwx.com/wp-content/uploads/2013/04/TWI_binary_record_format.pdf
+
+Thanks to weewx user Jason Kitchens for testing and validation.
+
+Commands:
+V - firmware version number
+S - firmware serial number
+I - unit ID number
+C - daily minimum and maximum of all parameters (rainfall rate), then clear
+c - daily minimum and maximum of all parameters (term rain), then clear
+D - same as C but no clear
+d - same as c but no clear
+E - min/max plus date and time of occurence
+e - min/max plus date and time of occurence
+M - term min/max with datetime then clear
+m - same as M but no clear
+R - current conditions (rainfall rate)
+r - current conditions (term rain)
+K - calculated values (dewpoint, windchill, heatindex)
+Q - hi resolution time, wind, temperature, pressure
+
+If there is logged data in memory (WLS-8000):
+T - top of data records, then send data
+N - next record, then send data
+A - same record again
+P - previous data record, then send data
+B - bottom of data records, then send data
+
+z - accumulated lightning data for current hour
+Z - current lightning data
+
+L - leaf wetness
 """
 
 # FIXME: implement wee_config interface for full set of commands:
@@ -22,7 +53,7 @@ import weewx.drivers
 from weewx.wxformulas import calculate_rain
 
 DRIVER_NAME = 'TWI'
-DRIVER_VERSION = '0.1'
+DRIVER_VERSION = '0.2'
 
 def loader(config_dict, _):
     return TWIDriver(**config_dict[DRIVER_NAME])
@@ -175,7 +206,7 @@ class TWIStation(object):
             raise weewx.RetriesExceeded(msg)
 
     def get_current(self):
-        return self.get_data_with_retry('R')
+        return self.get_data_with_retry('r')
 
     def get_firmware_version(self):
         return self.get_data_with_retry('V')
@@ -188,9 +219,12 @@ class TWIStation(object):
 
     @staticmethod
     def parse_current(s):
-        # sample string:
-        # 5:15 07/24/90 SSE 04MPH 052F 069F 078F 099% 30.04R 00.19"D 01.38"M 11.78"T
-        parts = s.split(' ')
+        # sample responses:
+# 5:15 07/24/90 SSE 04MPH 052F 069F 078F 099% 30.04R 00.19"D 01.38"M 11.78"T
+# 13:28 06/02/16 WSW 00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
+# 13:28 06/02/16 SW  00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
+# 13:29 06/02/16 W   00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 17.15"T
+        parts = s.split()
         data = dict()
         data['time'] = parts[0]
         data['date'] = parts[1]
