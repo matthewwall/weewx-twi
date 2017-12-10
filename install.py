@@ -9,7 +9,7 @@ def loader():
 class TWIInstaller(ExtensionInstaller):
     def __init__(self):
         super(TWIInstaller, self).__init__(
-            version="0.2",
+            version="0.3",
             name='twi',
             description='Collect data from Texas Weather Instruments hardware',
             author="Matthew Wall",

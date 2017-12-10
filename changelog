@@ -1,3 +1,6 @@
+0.3 10dec2017
+* hardware_name is a property
+
 0.2 04jun2016
 * fixed whitespace parsing issue (thanks to jason kitchens)
 * fixed rain calculation (thanks to jason kitchens)

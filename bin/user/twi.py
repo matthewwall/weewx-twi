@@ -53,7 +53,7 @@ import weewx.drivers
 from weewx.wxformulas import calculate_rain
 
 DRIVER_NAME = 'TWI'
-DRIVER_VERSION = '0.2'
+DRIVER_VERSION = '0.3'
 
 def loader(config_dict, _):
     return TWIDriver(**config_dict[DRIVER_NAME])
@@ -121,6 +121,7 @@ class TWIDriver(weewx.drivers.AbstractDevice):
     def closePort(self):
         self._station.close()
 
+    @property
     def hardware_name(self):
         return self._model
 
