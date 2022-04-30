@@ -1,3 +1,6 @@
+0.4 30apr2022
+* Port to Python 3 and WeeWX V4
+
 0.3 10dec2017
 * hardware_name is a property
 

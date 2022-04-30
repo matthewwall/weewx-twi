@@ -1,7 +1,7 @@
 # installer for twi driver
 # Copyright 2016 Matthew Wall
 
-from setup import ExtensionInstaller
+from weecfg.extension import ExtensionInstaller
 
 def loader():
     return TWIInstaller()
@@ -9,7 +9,7 @@ def loader():
 class TWIInstaller(ExtensionInstaller):
     def __init__(self):
         super(TWIInstaller, self).__init__(
-            version="0.3",
+            version="0.4",
             name='twi',
             description='Collect data from Texas Weather Instruments hardware',
             author="Matthew Wall",
