@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2016 Matthew Wall, all rights reserved
+# Copyright 2016-2022 Matthew Wall, all rights reserved
 """
 Collect data from Texas Weather Instruments stations.  This driver should work
 with at least the following models: WLS, WRL, WR, WPS.
@@ -44,7 +44,7 @@ L - leaf wetness
 # FIXME: detect WLS-8000 and read its data for genArchiveRecords
 # FIXME: implement host:port and read from socket instead of serial
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 import serial
 import syslog
 import time
@@ -53,26 +53,56 @@ import weewx.drivers
 from weewx.wxformulas import calculate_rain
 
 DRIVER_NAME = 'TWI'
-DRIVER_VERSION = '0.3'
+DRIVER_VERSION = '0.4'
+
 
 def loader(config_dict, _):
     return TWIDriver(**config_dict[DRIVER_NAME])
+
 
 def confeditor_loader():
     return TWIConfigurationEditor()
 
 
-def logmsg(level, msg):
-    syslog.syslog(level, 'twi: %s' % msg)
+# import/setup logging, WeeWX v3 is syslog based but WeeWX v4 is logging based,
+# try v4 logging and if it fails use v3 logging
+try:
+    # WeeWX4 logging
+    import logging
 
-def logdbg(msg):
-    logmsg(syslog.LOG_DEBUG, msg)
+    log = logging.getLogger(__name__)
 
-def loginf(msg):
-    logmsg(syslog.LOG_INFO, msg)
 
-def logerr(msg):
-    logmsg(syslog.LOG_ERR, msg)
+    def logdbg(msg):
+        log.debug(msg)
+
+
+    def loginf(msg):
+        log.info(msg)
+
+
+    def logerr(msg):
+        log.error(msg)
+
+except ImportError:
+    # WeeWX legacy (v3) logging via syslog
+    import syslog
+
+
+    def logmsg(level, msg):
+        syslog.syslog(level, 'twi: %s' % msg)
+
+
+    def logdbg(msg):
+        logmsg(syslog.LOG_DEBUG, msg)
+
+
+    def loginf(msg):
+        logmsg(syslog.LOG_INFO, msg)
+
+
+    def logerr(msg):
+        logmsg(syslog.LOG_ERR, msg)
 
 
 class TWIConfigurationEditor(weewx.drivers.AbstractConfEditor):
@@ -96,8 +126,8 @@ class TWIConfigurationEditor(weewx.drivers.AbstractConfEditor):
 """
 
     def prompt_for_settings(self):
-        print "Specify the serial port on which the station is connected, for"
-        print "example /dev/ttyUSB0 or /dev/ttyS0."
+        print("Specify the serial port on which the station is connected, for")
+        print("example /dev/ttyUSB0 or /dev/ttyS0.")
         port = self._prompt('port', '/dev/ttyUSB0')
         return {'port': port}
 
@@ -137,15 +167,18 @@ class TWIDriver(weewx.drivers.AbstractDevice):
             time.sleep(self._poll_interval)
 
     def _data_to_packet(self, data):
-        pkt = {'dateTime': int(time.time() + 0.5), 'usUnits': weewx.US}
-        pkt['windDir'] = data.get('wind_dir')
-        pkt['windSpeed'] = data.get('wind_speed')
-        pkt['inTemp'] = data.get('temperature_in')
-        pkt['outTemp'] = data.get('temperature_out')
-        pkt['extraTemp1'] = data.get('temperature_aux')
-        pkt['outHumidity'] = data.get('humidity')
-        pkt['pressure'] = data.get('pressure')
-        pkt['rain'] = calculate_rain(data['rain_total'], self.last_rain)
+        pkt = {
+            'dateTime': int(time.time() + 0.5),
+            'usUnits': weewx.US,
+            'windDir': data.get('wind_dir'),
+            'windSpeed': data.get('wind_speed'),
+            'inTemp': data.get('temperature_in'),
+            'outTemp': data.get('temperature_out'),
+            'extraTemp1': data.get('temperature_aux'),
+            'outHumidity': data.get('humidity'),
+            'pressure': data.get('pressure'),
+            'rain': calculate_rain(data['rain_total'], self.last_rain)
+        }
         self.last_rain = data['rain_total']
         return pkt
 
@@ -196,58 +229,60 @@ class TWIStation(object):
             try:
                 buf = self.get_data(cmd)
                 return buf
-            except (serial.serialutil.SerialException, weewx.WeeWxIOError), e:
-                loginf("Failed attempt %d of %d to get readings: %s" %
-                       (ntries + 1, self.max_tries, e))
+            except (serial.serialutil.SerialException, weewx.WeeWxIOError) as e:
+                loginf("Failed attempt %d of %d to get readings: %s"
+                       % (ntries + 1, self.max_tries, e))
                 time.sleep(self.retry_wait)
         else:
-            msg = "Max retries (%d) exceeded for command '%s'" % (
-                self._max_tries, cmd)
+            msg = "Max retries (%d) exceeded for command '%s'" \
+                  % (self._max_tries, cmd)
             logerr(msg)
             raise weewx.RetriesExceeded(msg)
 
     def get_current(self):
-        return self.get_data_with_retry('r')
+        return self.get_data_with_retry(b'r')
 
     def get_firmware_version(self):
-        return self.get_data_with_retry('V')
+        return self.get_data_with_retry(b'V')
 
     def get_firmware_serial(self):
-        return self.get_data_with_retry('S')
+        return self.get_data_with_retry(b'S')
 
     def get_unit_id(self):
-        return self.get_data_with_retry('I')
+        return self.get_data_with_retry(b'I')
 
     @staticmethod
     def parse_current(s):
         # sample responses:
-# 5:15 07/24/90 SSE 04MPH 052F 069F 078F 099% 30.04R 00.19"D 01.38"M 11.78"T
-# 13:28 06/02/16 WSW 00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
-# 13:28 06/02/16 SW  00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
-# 13:29 06/02/16 W   00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 17.15"T
+        # 5:15 07/24/90 SSE 04MPH 052F 069F 078F 099% 30.04R 00.19"D 01.38"M 11.78"T
+        # 13:28 06/02/16 WSW 00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
+        # 13:28 06/02/16 SW  00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
+        # 13:29 06/02/16 W   00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 17.15"T
         parts = s.split()
-        data = dict()
-        data['time'] = parts[0]
-        data['date'] = parts[1]
-        data['wind_dir'] = TWIStation.COMPASS_POINTS.get(parts[2])
-        data['wind_speed'] = TWIStation.try_float(parts[3][:2]) # mph
-        data['temperature_aux'] = TWIStation.try_float(parts[4][:3]) # F
-        data['temperature_in'] = TWIStation.try_float(parts[5][:3]) # F
-        data['temperature_out'] = TWIStation.try_float(parts[6][:3]) # F
-        data['humidity'] = TWIStation.try_float(parts[7][:3]) # %
-        data['pressure'] = TWIStation.try_float(parts[8][:-1]) # inHg
-        data['rain_day'] = TWIStation.try_float(parts[9][:-2]) # in
-        data['rain_month'] = TWIStation.try_float(parts[10][:-2]) # in
-        data['rain_total'] = TWIStation.try_float(parts[11][:-2]) # in
+        data = {
+            'time': parts[0],
+            'date': parts[1],
+            'wind_dir': TWIStation.COMPASS_POINTS.get(parts[2]),
+            'wind_speed': TWIStation.try_float(parts[3][:2]),
+            'temperature_aux': TWIStation.try_float(parts[4][:3]),
+            'temperature_in': TWIStation.try_float(parts[5][:3]),
+            'temperature_out': TWIStation.try_float(parts[6][:3]),
+            'humidity': TWIStation.try_float(parts[7][:3]),
+            'pressure': TWIStation.try_float(parts[8][:-1]),
+            'rain_day': TWIStation.try_float(parts[9][:-2]),
+            'rain_month': TWIStation.try_float(parts[10][:-2]),
+            'rain_total': TWIStation.try_float(parts[11][:-2])
+        }
         return data
 
     @staticmethod
     def try_float(s):
         try:
             return float(s)
-        except ValueError, e:
+        except ValueError:
             pass
         return None
+
 
 # define a main entry point for basic testing of the station without weewx
 # engine and service overhead.  invoke this as follows from the weewx root dir:
@@ -273,18 +308,18 @@ if __name__ == '__main__':
     (options, args) = parser.parse_args()
 
     if options.version:
-        print "twi driver version %s" % DRIVER_VERSION
+        print("twi driver version %s" % DRIVER_VERSION)
         exit(1)
 
     if options.debug:
         syslog.setlogmask(syslog.LOG_UPTO(syslog.LOG_DEBUG))
 
-    with TWIStation(port) as s:
-        print "unit id:", s.get_unit_id()
-        print "firmware serial:", s.get_firmware_serial()
-        print "firmware version:", s.get_firmware_version()
+    with TWIStation(options.port) as s:
+        print("unit id:", s.get_unit_id())
+        print("firmware serial:", s.get_firmware_serial())
+        print("firmware version:", s.get_firmware_version())
         while True:
             raw = s.get_current()
-            print "raw:", raw
-            print "parsed:", TWIStation.parse_current(raw)
+            print("raw:", raw)
+            print("parsed:", TWIStation.parse_current(raw))
             time.sleep(5)
