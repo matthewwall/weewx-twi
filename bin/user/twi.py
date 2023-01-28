@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright 2016-2022 Matthew Wall, all rights reserved
+# Copyright 2016-2023 Matthew Wall, all rights reserved
 """
 Collect data from Texas Weather Instruments stations.  This driver should work
 with at least the following models: WLS, WRL, WR, WPS.
@@ -53,8 +53,7 @@ import weewx.drivers
 from weewx.wxformulas import calculate_rain
 
 DRIVER_NAME = 'TWI'
-DRIVER_VERSION = '0.4'
-
+DRIVER_VERSION = '0.5'
 
 def loader(config_dict, _):
     return TWIDriver(**config_dict[DRIVER_NAME])
@@ -119,7 +118,7 @@ class TWIConfigurationEditor(weewx.drivers.AbstractConfEditor):
     model = WRL
 
     # How often, in seconds, to query the hardware for data
-    poll_interval = 15
+    poll_interval = 5
 
     # The driver to use
     driver = user.twi
@@ -129,14 +128,16 @@ class TWIConfigurationEditor(weewx.drivers.AbstractConfEditor):
         print("Specify the serial port on which the station is connected, for")
         print("example /dev/ttyUSB0 or /dev/ttyS0.")
         port = self._prompt('port', '/dev/ttyUSB0')
-        return {'port': port}
+        print("Specify how often, in seconds, to poll the station")
+        poll_interval = self._prompt('poll_interval', '5')
+        return {'port': port, 'poll_interval': poll_interval}
 
 
 class TWIDriver(weewx.drivers.AbstractDevice):
     def __init__(self, **stn_dict):
         loginf('driver version is %s' % DRIVER_VERSION)
         self._model = stn_dict.get('model', 'WRL')
-        self._poll_interval = int(stn_dict.get('poll_interval', 15))
+        self._poll_interval = int(stn_dict.get('poll_interval', 5))
         loginf('poll interval is %s' % self._poll_interval)
         max_tries = int(stn_dict.get('max_tries', 10))
         retry_wait = int(stn_dict.get('retry_wait', 10))
@@ -176,7 +177,7 @@ class TWIDriver(weewx.drivers.AbstractDevice):
             'outTemp': data.get('temperature_out'),
             'extraTemp1': data.get('temperature_aux'),
             'outHumidity': data.get('humidity'),
-            'pressure': data.get('pressure'),
+            'barometer': data.get('barometer'),
             'rain': calculate_rain(data['rain_total'], self.last_rain)
         }
         self.last_rain = data['rain_total']
@@ -184,10 +185,10 @@ class TWIDriver(weewx.drivers.AbstractDevice):
 
 
 class TWIStation(object):
-    COMPASS_POINTS = {'N': 0, 'NNE': 22.5, 'NE': 45, 'ENE': 67.5, 'E': 90,
-                      'ESE': 112.5, 'SE': 135, 'SSE': 157.5, 'S': 180,
-                      'SSW': 202.5, 'SW': 225, 'WSW': 247.5, 'W': 270,
-                      'WNW': 292.5, 'NW': 315, 'NNW': 337.5}
+    COMPASS_POINTS = {b'N': 0, b'NNE': 22.5, b'NE': 45, b'ENE': 67.5, b'E': 90,
+                      b'ESE': 112.5, b'SE': 135, b'SSE': 157.5, b'S': 180,
+                      b'SSW': 202.5, b'SW': 225, b'WSW': 247.5, b'W': 270,
+                      b'WNW': 292.5, b'NW': 315, b'NNW': 337.5}
     DEFAULT_PORT = '/dev/ttyUSB0'
 
     def __init__(self, port, max_tries=5, retry_wait=10):
@@ -207,8 +208,20 @@ class TWIStation(object):
 
     def open(self):
         logdbg("open serial port %s" % self.port)
-        self.serial_port = serial.Serial(
-            self.port, self.baudrate, timeout=self.timeout)
+        try:
+            self.serial_port = serial.Serial(
+                self.port, self.baudrate, timeout=self.timeout)
+            logdbg("%s" % repr(self.serial_port))
+            # Serial module docs recommend a one second wait after opening
+            # the port before writing to it to allow RTS and DTR to settle...
+            time.sleep(1)
+            # Ensure buffers start out empty...
+            self.serial_port.reset_input_buffer()
+            self.serial_port.reset_output_buffer()
+            self.serial_port.flush()
+        except (ValueError, serial.SerialException) as err:
+            logerr("TWIStation.open() error: %s" % repr(err))
+            #print("TWIStation.open() error: %s" % repr(err))
 
     def close(self):
         if self.serial_port is not None:
@@ -220,7 +233,9 @@ class TWIStation(object):
         logdbg("send cmd: %s" % cmd)
         self.serial_port.write(cmd)
         buf = self.serial_port.readline()
-        logdbg("station said: %s" % ' '.join(["%0.2X" % ord(c) for c in buf]))
+        # Keeping seeing an exception from ord() so don't do that...
+        #logdbg("station said: %s" % ' '.join(["%0.2X" % ord(c) for c in buf]))
+        logdbg("station said: %s" % buf)
         buf = buf.strip()
         return buf
 
@@ -259,6 +274,14 @@ class TWIStation(object):
         # 13:28 06/02/16 SW  00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
         # 13:29 06/02/16 W   00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 17.15"T
         parts = s.split()
+        # At least some versions of TWI firmware confuse negative
+        # outdoor temperatures, e.g. report '0-20F' instead of '-20F'.
+        # Detect and fix them here so conversion to float will work.
+        if parts and parts[6][1] == '-':
+            try:
+                parts[6] = '-%s' % parts[6][2:5]
+            except IndexError:
+                pass
         data = {
             'time': parts[0],
             'date': parts[1],
@@ -268,7 +291,7 @@ class TWIStation(object):
             'temperature_in': TWIStation.try_float(parts[5][:3]),
             'temperature_out': TWIStation.try_float(parts[6][:3]),
             'humidity': TWIStation.try_float(parts[7][:3]),
-            'pressure': TWIStation.try_float(parts[8][:-1]),
+            'barometer': TWIStation.try_float(parts[8][:-1]),
             'rain_day': TWIStation.try_float(parts[9][:-2]),
             'rain_month': TWIStation.try_float(parts[10][:-2]),
             'rain_total': TWIStation.try_float(parts[11][:-2])
@@ -287,7 +310,10 @@ class TWIStation(object):
 # define a main entry point for basic testing of the station without weewx
 # engine and service overhead.  invoke this as follows from the weewx root dir:
 #
-# PYTHONPATH=bin python bin/weewx/drivers/twi.py
+# PYTHONPATH=bin python3 bin/weewx/drivers/twi.py
+#    or maybe as below if weewx installed from a Debian package
+#    and the TWI driver was installed as an extra...
+# PYTHONPATH=/usr/share/weewx python3 /usr/share/weewx/user/twi.py
 
 if __name__ == '__main__':
     import optparse
