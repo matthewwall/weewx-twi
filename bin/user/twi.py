@@ -48,6 +48,7 @@ from __future__ import with_statement, print_function
 import serial
 import syslog
 import time
+#import pdb
 
 import weewx.drivers
 from weewx.wxformulas import calculate_rain
@@ -273,13 +274,14 @@ class TWIStation(object):
         # 13:28 06/02/16 WSW 00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
         # 13:28 06/02/16 SW  00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 00.00"R
         # 13:29 06/02/16 W   00MPH 460F 081F 086F 054% 29.31F 00.00"D 00.00"M 17.15"T
+        # b'04:23 01/29/23 NNW 00MPH 460F 063F 0-4F 094% 29.80R 00.00"D 00.00"M 00.00"T'
         parts = s.split()
         # At least some versions of TWI firmware confuse negative
         # outdoor temperatures, e.g. report '0-20F' instead of '-20F'.
         # Detect and fix them here so conversion to float will work.
-        if parts and parts[6][1] == '-':
+        if parts and parts[6][1:2] == b'-':
             try:
-                parts[6] = '-%s' % parts[6][2:5]
+                parts[6] = parts[6][1:].strip(b'F')
             except IndexError:
                 pass
         data = {
