@@ -179,6 +179,7 @@ class TWIDriver(weewx.drivers.AbstractDevice):
             'extraTemp1': data.get('temperature_aux'),
             'outHumidity': data.get('humidity'),
             'barometer': data.get('barometer'),
+            'altimeter': data.get('barometer'),
             'rain': calculate_rain(data['rain_total'], self.last_rain)
         }
         self.last_rain = data['rain_total']
