@@ -285,20 +285,24 @@ class TWIStation(object):
                 parts[6] = parts[6][1:].strip(b'F')
             except IndexError:
                 pass
-        data = {
-            'time': parts[0],
-            'date': parts[1],
-            'wind_dir': TWIStation.COMPASS_POINTS.get(parts[2]),
-            'wind_speed': TWIStation.try_float(parts[3][:2]),
-            'temperature_aux': TWIStation.try_float(parts[4][:3]),
-            'temperature_in': TWIStation.try_float(parts[5][:3]),
-            'temperature_out': TWIStation.try_float(parts[6][:3]),
-            'humidity': TWIStation.try_float(parts[7][:3]),
-            'barometer': TWIStation.try_float(parts[8][:-1]),
-            'rain_day': TWIStation.try_float(parts[9][:-2]),
-            'rain_month': TWIStation.try_float(parts[10][:-2]),
-            'rain_total': TWIStation.try_float(parts[11][:-2])
-        }
+        try:
+            data = {
+                'time': parts[0],
+                'date': parts[1],
+                'wind_dir': TWIStation.COMPASS_POINTS.get(parts[2]),
+                'wind_speed': TWIStation.try_float(parts[3][:2]),
+                'temperature_aux': TWIStation.try_float(parts[4][:3]),
+                'temperature_in': TWIStation.try_float(parts[5][:3]),
+                'temperature_out': TWIStation.try_float(parts[6][:3]),
+                'humidity': TWIStation.try_float(parts[7][:3]),
+                'barometer': TWIStation.try_float(parts[8][:-1]),
+                'rain_day': TWIStation.try_float(parts[9][:-2]),
+                'rain_month': TWIStation.try_float(parts[10][:-2]),
+                'rain_total': TWIStation.try_float(parts[11][:-2])
+            }
+        except IndexError as err:
+            loginf("ERROR:bad value from station? -- %s %s", (parts, err))
+
         return data
 
     @staticmethod
