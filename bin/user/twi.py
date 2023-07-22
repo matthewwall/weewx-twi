@@ -284,7 +284,7 @@ class TWIStation(object):
             try:
                 parts[6] = parts[6][1:].strip(b'F')
             except IndexError:
-                pass
+                loginf("ERROR: flubbed negative temp fix! %s" % parts[6])
         try:
             data = {
                 'time': parts[0],
@@ -301,7 +301,7 @@ class TWIStation(object):
                 'rain_total': TWIStation.try_float(parts[11][:-2])
             }
         except IndexError as err:
-            loginf("ERROR:bad value from station? -- %s %s", (parts, err))
+            loginf("ERROR:bad value from station? -- %s %s" % (parts, err))
 
         return data
 
